@@ -3,7 +3,6 @@
 
 ---
 
-## 🚀 Quick Start
 
 ### Requirements
 - Java JDK 8 or higher (`javac` and `java` commands)
