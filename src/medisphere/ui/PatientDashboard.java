@@ -23,6 +23,8 @@ public class PatientDashboard extends JPanel {
     private JPanel contentArea;
     private CardLayout contentLayout;
     private JLabel notifBadge;
+    private JPanel homeStatsPanel;
+    private JPanel homeApptList;
     private String activeNav = "HOME";
 
     // Nav card names
@@ -170,6 +172,7 @@ public class PatientDashboard extends JPanel {
         btn.addActionListener(e -> {
             activeNav = card;
             refreshNav();
+            if (card.equals(NAV_HOME))   refreshHome();
             if (card.equals(NAV_NOTIF))  refreshNotifications();
             if (card.equals(NAV_APPTS))  refreshAppointments();
             contentLayout.show(contentArea, card);
@@ -264,53 +267,74 @@ public class PatientDashboard extends JPanel {
         bookNow.addActionListener(e -> { activeNav=NAV_SEARCH; refreshNav(); contentLayout.show(contentArea,NAV_SEARCH); });
         welcome.add(bookNow, BorderLayout.EAST);
 
-        // Stats
-        List<Appointment> all  = facade.getPatientAppointments(patient.getUserId());
-        long upcoming   = all.stream().filter(a -> a.isUpcoming() && a.getStatus() != AppointmentStatus.CANCELLED).count();
-        long completed  = all.stream().filter(a -> a.getStatus() == AppointmentStatus.COMPLETED).count();
-        long cancelled  = all.stream().filter(a -> a.getStatus() == AppointmentStatus.CANCELLED).count();
-
-        JPanel stats = new JPanel(new GridLayout(1,4,16,0));
-        stats.setOpaque(false);
-        stats.add(UITheme.statCard("\uD83D\uDCC5", String.valueOf(all.size()),    "Total Appointments", UITheme.PRIMARY));
-        stats.add(UITheme.statCard("\u23F0",        String.valueOf(upcoming),      "Upcoming",           UITheme.WARN));
-        stats.add(UITheme.statCard("\u2705",        String.valueOf(completed),     "Completed",          UITheme.ACCENT));
-        stats.add(UITheme.statCard("\u274C",        String.valueOf(cancelled),     "Cancelled",          UITheme.DANGER));
+        // Stats and upcoming list are dynamic and refreshed when Home is shown
+        homeStatsPanel = new JPanel(new GridLayout(1,4,16,0));
+        homeStatsPanel.setOpaque(false);
 
         // Recent appointments
         JLabel secTitle = new JLabel("Upcoming Appointments");
         secTitle.setFont(UITheme.FONT_HEADER); secTitle.setForeground(UITheme.TEXT_PRIMARY);
 
-        JPanel apptList = new JPanel();
-        apptList.setLayout(new BoxLayout(apptList, BoxLayout.Y_AXIS));
-        apptList.setOpaque(false);
-
-        List<Appointment> upcoming_list = facade.getPatientAppointments(patient.getUserId())
-                .stream().filter(a -> a.isUpcoming() && a.getStatus() != AppointmentStatus.CANCELLED)
-                .limit(3).collect(java.util.stream.Collectors.toList());
-
-        if (upcoming_list.isEmpty()) {
-            JLabel empty = new JLabel("No upcoming appointments.  Click 'Book Appointment' to get started.");
-            empty.setFont(UITheme.FONT_BODY); empty.setForeground(UITheme.TEXT_MUTED);
-            empty.setBorder(new EmptyBorder(20,0,20,0));
-            apptList.add(empty);
-        } else {
-            for (Appointment a : upcoming_list) apptList.add(buildApptRow(a));
-        }
+        homeApptList = new JPanel();
+        homeApptList.setLayout(new BoxLayout(homeApptList, BoxLayout.Y_AXIS));
+        homeApptList.setOpaque(false);
 
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
         center.setOpaque(false);
         center.add(Box.createVerticalStrut(20));
-        center.add(stats);
+        center.add(homeStatsPanel);
         center.add(Box.createVerticalStrut(28));
         center.add(secTitle);
         center.add(Box.createVerticalStrut(14));
-        center.add(apptList);
+        center.add(homeApptList);
 
         panel.add(welcome, BorderLayout.NORTH);
         panel.add(center,  BorderLayout.CENTER);
+
+        refreshHome();
         return panel;
+    }
+
+    private void refreshHome() {
+        if (homeStatsPanel == null || homeApptList == null) return;
+
+        List<Appointment> all = facade.getPatientAppointments(patient.getUserId());
+        long upcoming = all.stream()
+                .filter(a -> a.isUpcoming() && a.getStatus() != AppointmentStatus.CANCELLED)
+                .count();
+        long completed = all.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.COMPLETED)
+                .count();
+        long cancelled = all.stream()
+                .filter(a -> a.getStatus() == AppointmentStatus.CANCELLED)
+                .count();
+
+        homeStatsPanel.removeAll();
+        homeStatsPanel.add(UITheme.statCard("\uD83D\uDCC5", String.valueOf(all.size()),  "Total Appointments", UITheme.PRIMARY));
+        homeStatsPanel.add(UITheme.statCard("\u23F0",        String.valueOf(upcoming),    "Upcoming",           UITheme.WARN));
+        homeStatsPanel.add(UITheme.statCard("\u2705",        String.valueOf(completed),   "Completed",          UITheme.ACCENT));
+        homeStatsPanel.add(UITheme.statCard("\u274C",        String.valueOf(cancelled),   "Cancelled",          UITheme.DANGER));
+        homeStatsPanel.revalidate();
+        homeStatsPanel.repaint();
+
+        homeApptList.removeAll();
+        List<Appointment> upcomingList = all.stream()
+                .filter(a -> a.isUpcoming() && a.getStatus() != AppointmentStatus.CANCELLED)
+                .limit(3)
+                .collect(java.util.stream.Collectors.toList());
+
+        if (upcomingList.isEmpty()) {
+            JLabel empty = new JLabel("No upcoming appointments.  Click 'Book Appointment' to get started.");
+            empty.setFont(UITheme.FONT_BODY);
+            empty.setForeground(UITheme.TEXT_MUTED);
+            empty.setBorder(new EmptyBorder(20,0,20,0));
+            homeApptList.add(empty);
+        } else {
+            for (Appointment a : upcomingList) homeApptList.add(buildApptRow(a));
+        }
+        homeApptList.revalidate();
+        homeApptList.repaint();
     }
 
     private JPanel buildApptRow(Appointment a) {
@@ -614,18 +638,67 @@ public class PatientDashboard extends JPanel {
         cancel.addActionListener(e -> dlg.dispose());
         confirm.addActionListener(e -> {
             String symp = sympTa.getText().trim();
-            if (symp.isEmpty()) { errL.setText("Please describe your symptoms/reason."); return; }
-            int dayIdx = dateCb.getSelectedIndex();
-            LocalDate date = LocalDate.now().plusDays(dayIdx + 1);
-            String tStr = (String) timeCb.getSelectedItem();
-            java.time.format.DateTimeFormatter tf2 = java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
-            LocalTime time = LocalTime.parse(tStr, tf2);
-            Appointment appt = facade.bookAppointment(patient.getUserId(), doc.getUserId(), date, time, symp);
-            dlg.dispose();
-            JOptionPane.showMessageDialog(frame,
-                "Appointment booked!\n" + appt.getFormattedDateTime() + "\nStatus: " + appt.getStatus(),
-                "Booking Confirmed", JOptionPane.INFORMATION_MESSAGE);
-            updateNotifBadge();
+            if (symp.isEmpty()) {
+                errL.setText("Please describe your symptoms/reason.");
+                return;
+            }
+
+            try {
+                int dayIdx = dateCb.getSelectedIndex();
+                LocalDate date = LocalDate.now().plusDays(dayIdx + 1);
+                String tStr = (String) timeCb.getSelectedItem();
+
+                java.time.format.DateTimeFormatter tf2 =
+                    java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.ENGLISH);
+                LocalTime time = LocalTime.parse(tStr, tf2);
+
+                int choice = JOptionPane.showConfirmDialog(
+                    frame,
+                    "Confirm appointment with " + doc.getName() + " on " + date + " at " + tStr + "?",
+                    "Confirm Appointment",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+                );
+                if (choice != JOptionPane.YES_OPTION) return;
+
+                Appointment appt = facade.bookAppointment(
+                    patient.getUserId(), doc.getUserId(), date, time, symp
+                );
+
+                if (appt == null) {
+                    JOptionPane.showMessageDialog(
+                        frame,
+                        "Unable to book appointment. Please try another slot.",
+                        "Booking Failed",
+                        JOptionPane.ERROR_MESSAGE
+                    );
+                    return;
+                }
+
+                dlg.dispose();
+                JOptionPane.showMessageDialog(
+                    frame,
+                    "Appointment booked successfully.\n\nDate & Time: " + appt.getFormattedDateTime()
+                        + "\nStatus: " + appt.getStatus().getLabel(),
+                    "Booking Successful",
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+
+                updateNotifBadge();
+                refreshHome();
+                refreshAppointments();
+                activeNav = NAV_APPTS;
+                refreshNav();
+                contentLayout.show(contentArea, NAV_APPTS);
+
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(
+                    frame,
+                    "Booking failed: " + ex.getMessage(),
+                    "Booking Failed",
+                    JOptionPane.ERROR_MESSAGE
+                );
+            }
         });
         btnRow.add(cancel); btnRow.add(confirm);
 
@@ -736,6 +809,7 @@ public class PatientDashboard extends JPanel {
                 if (c == JOptionPane.YES_OPTION) {
                     facade.cancelAppointment(a.getAppointmentId(), patient.getUserId());
                     updateNotifBadge();
+                    refreshHome();
                     refreshAppointments();
                 }
             });
@@ -769,10 +843,12 @@ public class PatientDashboard extends JPanel {
         if (res == JOptionPane.OK_OPTION) {
             LocalDate date = LocalDate.now().plusDays(dateCb.getSelectedIndex()+1);
             String tStr = (String) timeCb.getSelectedItem();
-            java.time.format.DateTimeFormatter tf2 = java.time.format.DateTimeFormatter.ofPattern("hh:mm a");
+            java.time.format.DateTimeFormatter tf2 =
+                java.time.format.DateTimeFormatter.ofPattern("hh:mm a", java.util.Locale.ENGLISH);
             LocalTime time = LocalTime.parse(tStr, tf2);
             facade.rescheduleAppointment(a.getAppointmentId(), date, time, patient.getUserId());
             updateNotifBadge();
+            refreshHome();
             refreshAppointments();
             JOptionPane.showMessageDialog(frame,"Appointment rescheduled successfully!","Success",JOptionPane.INFORMATION_MESSAGE);
         }

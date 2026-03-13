@@ -150,7 +150,9 @@ public class DoctorDashboard extends JPanel {
             new EmptyBorder(12,30,12,30)));
         JLabel title = new JLabel("Doctor Dashboard");
         title.setFont(new Font("Segoe UI", Font.BOLD, 18)); title.setForeground(UITheme.TEXT_PRIMARY);
-        JLabel greeting = new JLabel("Welcome, Dr. " + doctor.getName().split(" ")[1]);
+        String[] nameTokens = doctor.getName().trim().split("\\s+");
+        String displayName = nameTokens.length > 1 ? nameTokens[1] : doctor.getName();
+        JLabel greeting = new JLabel("Welcome, Dr. " + displayName);
         greeting.setFont(UITheme.FONT_BODY); greeting.setForeground(UITheme.TEXT_SECONDARY);
         bar.add(title, BorderLayout.WEST); bar.add(greeting, BorderLayout.EAST);
         return bar;
@@ -193,6 +195,10 @@ public class DoctorDashboard extends JPanel {
         stats.add(UITheme.statCard("\u23F0",        String.valueOf(upcoming),       "Upcoming",           UITheme.WARN));
         stats.add(UITheme.statCard("\u2705",        String.valueOf(completed),      "Completed",          UITheme.ACCENT));
 
+        JPanel statsWrap = new JPanel(new BorderLayout());
+        statsWrap.setOpaque(false);
+        statsWrap.add(stats, BorderLayout.NORTH);
+
         // Today's schedule
         JLabel secL = new JLabel("Today's Appointments");
         secL.setFont(UITheme.FONT_HEADER); secL.setForeground(UITheme.TEXT_PRIMARY);
@@ -214,15 +220,21 @@ public class DoctorDashboard extends JPanel {
             for (Appointment a : todayAppts) todayList.add(buildApptRow(a));
         }
 
+        JPanel todaySection = UITheme.card(14);
+        todaySection.setBackground(Color.WHITE);
+        todaySection.setLayout(new BorderLayout());
+        todaySection.setBorder(BorderFactory.createCompoundBorder(
+            new UITheme.ShadowBorder(), new EmptyBorder(16,18,16,18)));
+        todaySection.add(secL, BorderLayout.NORTH);
+        todaySection.add(todayList, BorderLayout.CENTER);
+
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
         center.setOpaque(false);
         center.add(Box.createVerticalStrut(20));
-        center.add(stats);
+        center.add(statsWrap);
         center.add(Box.createVerticalStrut(28));
-        center.add(secL);
-        center.add(Box.createVerticalStrut(14));
-        center.add(todayList);
+        center.add(todaySection);
 
         panel.add(welcome, BorderLayout.NORTH);
         panel.add(center,  BorderLayout.CENTER);
@@ -233,39 +245,61 @@ public class DoctorDashboard extends JPanel {
         Patient pat = (Patient) store.getUserById(a.getPatientId());
         JPanel card = UITheme.card(10);
         card.setBackground(Color.WHITE);
-        card.setLayout(new BorderLayout(12,0));
+        card.setLayout(new BorderLayout(16,0));
         card.setBorder(BorderFactory.createCompoundBorder(
             new UITheme.ShadowBorder(), new EmptyBorder(12,16,12,16)));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 104));
 
-        JPanel info = new JPanel(new GridLayout(2,1,0,2)); info.setOpaque(false);
+        JPanel info = new JPanel();
+        info.setOpaque(false);
+        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
         JLabel pname = new JLabel(pat!=null?pat.getName():"Unknown Patient");
         pname.setFont(new Font("Segoe UI", Font.BOLD, 13)); pname.setForeground(UITheme.TEXT_PRIMARY);
-        JLabel symp  = new JLabel("Symptoms: " + a.getSymptoms());
-        symp.setFont(UITheme.FONT_SMALL); symp.setForeground(UITheme.TEXT_SECONDARY);
-        info.add(pname); info.add(symp);
+        pname.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel dt = new JLabel(a.getFormattedTime());
-        dt.setFont(UITheme.FONT_BODY); dt.setForeground(UITheme.PRIMARY);
+        String symptomsText = a.getSymptoms()!=null && !a.getSymptoms().isBlank()
+                ? a.getSymptoms()
+                : "No symptoms provided";
+        JLabel symp  = new JLabel("Symptoms: " + symptomsText);
+        symp.setFont(UITheme.FONT_SMALL); symp.setForeground(UITheme.TEXT_SECONDARY);
+        symp.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel dt = new JLabel("\uD83D\uDCC5  " + a.getFormattedDateTime());
+        dt.setFont(UITheme.FONT_BODY); dt.setForeground(UITheme.TEXT_SECONDARY);
 
         Color sc = statusColor(a.getStatus());
         JLabel badge = UITheme.statusBadge(a.getStatus().getLabel(), sc);
+        JPanel meta = new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));
+        meta.setOpaque(false);
+        meta.setAlignmentX(Component.LEFT_ALIGNMENT);
+        meta.add(dt);
+        meta.add(badge);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0)); right.setOpaque(false);
-        right.add(dt); right.add(badge);
+        info.add(pname);
+        info.add(Box.createVerticalStrut(4));
+        info.add(symp);
+        info.add(Box.createVerticalStrut(8));
+        info.add(meta);
 
         // Complete button
         if (a.getStatus()==AppointmentStatus.CONFIRMED || a.getStatus()==AppointmentStatus.PENDING) {
             JButton done = UITheme.successButton("Complete");
+            done.setPreferredSize(new Dimension(110, 34));
             done.addActionListener(e -> {
                 String notes = JOptionPane.showInputDialog(frame,"Doctor's notes (optional):","");
-                facade.completeAppointment(a.getAppointmentId(), doctor.getUserId(), notes==null?"":notes);
+                if (notes == null) return;
+                facade.completeAppointment(a.getAppointmentId(), doctor.getUserId(), notes);
                 JOptionPane.showMessageDialog(frame,"Appointment marked as completed.","Done",JOptionPane.INFORMATION_MESSAGE);
+                refreshSchedule();
             });
-            right.add(done);
+            JPanel actionArea = new JPanel(new FlowLayout(FlowLayout.RIGHT,0,0));
+            actionArea.setOpaque(false);
+            actionArea.setPreferredSize(new Dimension(120, 0));
+            actionArea.add(done);
+            card.add(actionArea, BorderLayout.EAST);
         }
 
-        card.add(info, BorderLayout.CENTER); card.add(right, BorderLayout.EAST);
+        card.add(info, BorderLayout.CENTER);
         JPanel wrap = new JPanel(new BorderLayout()); wrap.setOpaque(false);
         wrap.setBorder(new EmptyBorder(0,0,8,0)); wrap.add(card, BorderLayout.CENTER);
         return wrap;
@@ -278,6 +312,24 @@ public class DoctorDashboard extends JPanel {
 
         JLabel title = new JLabel("My Schedule");
         title.setFont(UITheme.FONT_TITLE); title.setForeground(UITheme.TEXT_PRIMARY);
+        JLabel sub = new JLabel("All your appointments in one place.");
+        sub.setFont(UITheme.FONT_BODY); sub.setForeground(UITheme.TEXT_SECONDARY);
+
+        JPanel titleGroup = new JPanel();
+        titleGroup.setOpaque(false);
+        titleGroup.setLayout(new BoxLayout(titleGroup, BoxLayout.Y_AXIS));
+        titleGroup.add(title);
+        titleGroup.add(Box.createVerticalStrut(4));
+        titleGroup.add(sub);
+
+        JButton refreshBtn = UITheme.secondaryButton("\uD83D\uDD04 Refresh");
+        refreshBtn.addActionListener(e -> refreshSchedule());
+
+        JPanel top = new JPanel(new BorderLayout());
+        top.setOpaque(false);
+        top.setBorder(new EmptyBorder(0,0,12,0));
+        top.add(titleGroup, BorderLayout.WEST);
+        top.add(refreshBtn, BorderLayout.EAST);
 
         scheduleList = new JPanel();
         scheduleList.setLayout(new BoxLayout(scheduleList, BoxLayout.Y_AXIS));
@@ -286,7 +338,7 @@ public class DoctorDashboard extends JPanel {
         JScrollPane scroll = new JScrollPane(scheduleList);
         UITheme.flatScrollPane(scroll);
 
-        panel.add(title,  BorderLayout.NORTH);
+        panel.add(top,    BorderLayout.NORTH);
         panel.add(scroll, BorderLayout.CENTER);
         refreshSchedule();
         return panel;
@@ -300,7 +352,8 @@ public class DoctorDashboard extends JPanel {
         List<Appointment> appts = facade.getDoctorAppointments(doctor.getUserId());
         if (appts.isEmpty()) {
             JLabel e = new JLabel("No appointments in your schedule.");
-            e.setFont(UITheme.FONT_BODY); e.setForeground(UITheme.TEXT_MUTED); scheduleList.add(e);
+            e.setFont(UITheme.FONT_BODY); e.setForeground(UITheme.TEXT_MUTED);
+            scheduleList.add(e);
         } else {
             for (Appointment a : appts) scheduleList.add(buildApptRow(a));
         }
@@ -331,8 +384,12 @@ public class DoctorDashboard extends JPanel {
         addRow(form,"Consult. Fee",   doctor.getFormattedFee());
         addRow(form,"Rating",         doctor.getRatingStars() + " " + String.format("%.1f",doctor.getRating()));
 
+        JPanel center = new JPanel(new BorderLayout());
+        center.setOpaque(false);
+        center.add(form, BorderLayout.NORTH);
+
         panel.add(title, BorderLayout.NORTH);
-        panel.add(form,  BorderLayout.CENTER);
+        panel.add(center, BorderLayout.CENTER);
         return panel;
     }
 
