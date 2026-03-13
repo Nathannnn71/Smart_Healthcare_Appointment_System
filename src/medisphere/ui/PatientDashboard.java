@@ -270,24 +270,39 @@ public class PatientDashboard extends JPanel {
         // Stats and upcoming list are dynamic and refreshed when Home is shown
         homeStatsPanel = new JPanel(new GridLayout(1,4,16,0));
         homeStatsPanel.setOpaque(false);
+        homeStatsPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel statsWrap = new JPanel(new BorderLayout());
+        statsWrap.setOpaque(false);
+        statsWrap.setAlignmentX(Component.LEFT_ALIGNMENT);
+        statsWrap.add(homeStatsPanel, BorderLayout.NORTH);
 
         // Recent appointments
         JLabel secTitle = new JLabel("Upcoming Appointments");
         secTitle.setFont(UITheme.FONT_HEADER); secTitle.setForeground(UITheme.TEXT_PRIMARY);
+        secTitle.setBorder(new EmptyBorder(0,0,10,0));
 
         homeApptList = new JPanel();
         homeApptList.setLayout(new BoxLayout(homeApptList, BoxLayout.Y_AXIS));
         homeApptList.setOpaque(false);
+        homeApptList.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JPanel upcomingSection = UITheme.card(14);
+        upcomingSection.setBackground(Color.WHITE);
+        upcomingSection.setLayout(new BorderLayout());
+        upcomingSection.setAlignmentX(Component.LEFT_ALIGNMENT);
+        upcomingSection.setBorder(BorderFactory.createCompoundBorder(
+            new UITheme.ShadowBorder(), new EmptyBorder(14,18,14,18)));
+        upcomingSection.add(secTitle, BorderLayout.NORTH);
+        upcomingSection.add(homeApptList, BorderLayout.CENTER);
 
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
         center.setOpaque(false);
+        center.add(Box.createVerticalStrut(18));
+        center.add(statsWrap);
         center.add(Box.createVerticalStrut(20));
-        center.add(homeStatsPanel);
-        center.add(Box.createVerticalStrut(28));
-        center.add(secTitle);
-        center.add(Box.createVerticalStrut(14));
-        center.add(homeApptList);
+        center.add(upcomingSection);
 
         panel.add(welcome, BorderLayout.NORTH);
         panel.add(center,  BorderLayout.CENTER);
@@ -328,6 +343,7 @@ public class PatientDashboard extends JPanel {
             JLabel empty = new JLabel("No upcoming appointments.  Click 'Book Appointment' to get started.");
             empty.setFont(UITheme.FONT_BODY);
             empty.setForeground(UITheme.TEXT_MUTED);
+            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
             empty.setBorder(new EmptyBorder(20,0,20,0));
             homeApptList.add(empty);
         } else {
@@ -341,39 +357,48 @@ public class PatientDashboard extends JPanel {
         Doctor doc = (Doctor) store.getUserById(a.getDoctorId());
         JPanel card = UITheme.card(12);
         card.setBackground(Color.WHITE);
-        card.setLayout(new BorderLayout(12,0));
+        card.setLayout(new BorderLayout(14,0));
         card.setBorder(BorderFactory.createCompoundBorder(
-            new UITheme.ShadowBorder(), new EmptyBorder(14,18,14,18)));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE,80));
+            new UITheme.ShadowBorder(), new EmptyBorder(12,16,12,16)));
+        card.setMaximumSize(new Dimension(Integer.MAX_VALUE,92));
 
-        // Left: doc name & spec
-        JPanel left = new JPanel(new GridLayout(2,1,0,2));
-        left.setOpaque(false);
+        JPanel info = new JPanel();
+        info.setOpaque(false);
+        info.setLayout(new BoxLayout(info, BoxLayout.Y_AXIS));
+
         JLabel dname = new JLabel(doc != null ? doc.getName() : "Unknown Doctor");
         dname.setFont(new Font("Segoe UI", Font.BOLD, 14));
         dname.setForeground(UITheme.TEXT_PRIMARY);
+        dname.setAlignmentX(Component.LEFT_ALIGNMENT);
+
         JLabel spec = new JLabel(doc != null ? doc.getSpecialization().getName() : "");
         spec.setFont(UITheme.FONT_SMALL); spec.setForeground(UITheme.TEXT_SECONDARY);
-        left.add(dname); left.add(spec);
+        spec.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Center: date/time
         JLabel dateL = new JLabel("\uD83D\uDCC5  " + a.getFormattedDateTime());
         dateL.setFont(UITheme.FONT_BODY); dateL.setForeground(UITheme.TEXT_SECONDARY);
+        dateL.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Right: status badge + action buttons
+        info.add(dname);
+        info.add(Box.createVerticalStrut(2));
+        info.add(spec);
+        info.add(Box.createVerticalStrut(6));
+        info.add(dateL);
+
         Color sc = statusColor(a.getStatus());
         JLabel badge = UITheme.statusBadge(a.getStatus().getLabel(), sc);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,8,0));
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,0,0));
         right.setOpaque(false);
+        right.setPreferredSize(new Dimension(124,0));
         right.add(badge);
 
-        card.add(left,  BorderLayout.WEST);
-        card.add(dateL, BorderLayout.CENTER);
+        card.add(info,  BorderLayout.CENTER);
         card.add(right, BorderLayout.EAST);
 
         JPanel wrap = new JPanel(new BorderLayout());
         wrap.setOpaque(false);
+        wrap.setAlignmentX(Component.LEFT_ALIGNMENT);
         wrap.add(card, BorderLayout.CENTER);
         wrap.setBorder(new EmptyBorder(0,0,10,0));
         return wrap;
